@@ -13,3 +13,6 @@ target_link_libraries(single_channel_mask ${ITK_LIBRARIES})
 
 add_executable(merge_and_watershed merge_and_watershed.cpp)
 target_link_libraries(merge_and_watershed ${ITK_LIBRARIES})
+
+add_executable(ck_segment ck_segment.cpp)
+target_link_libraries(ck_segment ${ITK_LIBRARIES})
