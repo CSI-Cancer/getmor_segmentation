@@ -33,6 +33,7 @@ using std::cerr;
 using std::endl;
 using std::string;
 using std::vector;
+using std::ofstream;
 
 constexpr size_t Dimension = 2;
 
@@ -50,9 +51,9 @@ using LargeIntegerReaderType = itk::ImageFileReader<LargeIntegerImageType>;
 /******************************************************************************/
 // image reader
 static void
-read_frame(ReaderType::Pointer &reader,
-           const string &file,
-           IntegerImageType::Pointer &in) {
+read_img(ReaderType::Pointer &reader,
+         const string &file,
+         IntegerImageType::Pointer &in) {
 
   reader->SetFileName(file);
   try {
@@ -64,6 +65,24 @@ read_frame(ReaderType::Pointer &reader,
          << e << endl;
   }
 }
+
+// large int frame frame reader
+static void
+read_img(LargeIntegerReaderType::Pointer &reader,
+         const string &file,
+         LargeIntegerImageType::Pointer &in) {
+
+  reader->SetFileName(file);
+  try {
+    reader->Update();
+    in = reader->GetOutput();
+  }
+  catch (const itk::ExceptionObject &e) {
+    cerr << "ITK EXCEPTION:"  << endl
+         << e << endl;
+  }
+}
+
 
 /******************************************************************************/
 /* Misc.                                                                      */
@@ -93,13 +112,13 @@ main (int argc, char* argv[]) {
     /**************************************************************************/
     if (argc < 7) {
       cerr << argv[0] 
-           << " <in_dir> <out_dir> <sample_name>"
+           << " <frame_dir> <label_dir> <sample_name>"
            << " <start_offset> <num_frames> <channel_start>" << endl;
       return EXIT_FAILURE;
     }
 
-    const string in_dir = argv[1];
-    const string out_dir = argv[2];
+    const string frame_dir = argv[1];
+    const string label_dir = argv[2];
     const string sample_name = argv[3];
     const size_t start_offset = std::stoi(argv[4]);
     const size_t n_frames = std::stoi(argv[5]);
@@ -122,6 +141,9 @@ main (int argc, char* argv[]) {
     LargeIntegerReaderType::Pointer reader_large_int = 
       LargeIntegerReaderType::New(); 
  
+    // file handlers
+    ofstream features_file(label_dir + sample_name + "_feature_vec.txt");
+
     /**************************************************************************/
     /* Generate file names                                                    */
     /**************************************************************************/
@@ -150,11 +172,24 @@ main (int argc, char* argv[]) {
     /**************************************************************************/
     for (size_t i = 0; i < n_frames; ++i) {
 
+      // read label
+      LargeIntegerImageType::Pointer in_label;
+      read_img(reader_large_int, frame_dir + label_files[i], in_label);
+
+      // generate shape features
+  
+      // generate intensity features for each channel
+      for (size_t j = 0; j < n_channels; ++j) {
+        IntegerImageType::Pointer in_frame;
+        read_img(reader, label_dir + in_frame_files[i][j], in_frame);
+      }
+
     }
   
     /**************************************************************************/
     /* Clean-up and exit                                                      */
     /**************************************************************************/
+    features_file.close();
 
   } 
   catch (const std::exception &e) {
