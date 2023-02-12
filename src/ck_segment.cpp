@@ -44,6 +44,12 @@
 #include "itkMaskedImageToHistogramFilter.h"
 #include "itkBinaryReconstructionByDilationImageFilter.h"
 
+#include "itkLabelOverlayImageFilter.h"
+#include "itkInvertIntensityImageFilter.h"
+#include "itkRescaleIntensityImageFilter.h"
+#include "itkDanielssonDistanceMapImageFilter.h"
+#include "itkMorphologicalWatershedImageFilter.h"
+
 /******************************************************************************/
 /* Type definitions                                                           */
 /******************************************************************************/
@@ -59,13 +65,18 @@ constexpr size_t Dimension = 2;
 
 using IntegerPixelType = uint8_t;
 using IntegerImageType = itk::Image<IntegerPixelType, Dimension>;
-
+using LargeIntegerPixelType = uint16_t;
+using LargeIntegerImageType = itk::Image<LargeIntegerPixelType, Dimension>;
 using RealPixelType = float;
 using RealImageType = itk::Image<RealPixelType, Dimension>;
+using RGBPixelType = itk::RGBPixel<uint8_t>;
+using RGBImageType = itk::Image<RGBPixelType, Dimension>;
 
 using NameGeneratorType = itk::NumericSeriesFileNames;
 using ReaderType = itk::ImageFileReader<IntegerImageType>;
 using WriterType = itk::ImageFileWriter<IntegerImageType>;
+using LargeIntegerWriterType = itk::ImageFileWriter<LargeIntegerImageType>;
+using RGBWriterType = itk::ImageFileWriter<RGBImageType>;
 
 using CastToRealType =
   itk::CastImageFilter<IntegerImageType, RealImageType>;
@@ -85,12 +96,28 @@ using BinaryThType =
 using ReconstructType =
   itk::BinaryReconstructionByDilationImageFilter<RealImageType>;
 
+using DistMapType = 
+  itk::DanielssonDistanceMapImageFilter<RealImageType, RealImageType>;
+using InvertIntensityType =
+  itk::InvertIntensityImageFilter<RealImageType, RealImageType>;
+using WatershedType = 
+  itk::MorphologicalWatershedImageFilter<RealImageType, 
+                                         LargeIntegerImageType>;
+using WatershedMaskType = itk::MaskImageFilter<LargeIntegerImageType,
+                                               RealImageType,
+                                               LargeIntegerImageType>;
+
+using RescalerType = 
+  itk::RescaleIntensityImageFilter<RealImageType, RealImageType>;
+using LabelOverlayType = itk::LabelOverlayImageFilter<RealImageType,
+                                                      LargeIntegerImageType,
+                                                      RGBImageType>;
+
 /******************************************************************************/
 /* Reader and writer                                                          */
 /******************************************************************************/
 // image reader
-// blocks until a frame is read
-void
+static void
 read_frame(ReaderType::Pointer &reader,
            const string &file,
            IntegerImageType::Pointer &in) {
@@ -106,10 +133,45 @@ read_frame(ReaderType::Pointer &reader,
   }
 }
 
-void
+// integer image writer
+static void
 write_frame(WriterType::Pointer &writer,
             const string &file,
             const IntegerImageType::Pointer &out) {
+
+  writer->SetFileName(file + ".tif");
+  writer->SetInput(out);
+  try {
+    writer->Update();
+  }
+  catch (const itk::ExceptionObject &e) {
+    cerr << "ITK EXCEPTION:" << endl
+         << e << endl;
+  }
+}
+
+// larger integer writer
+static void
+write_frame_large_int(LargeIntegerWriterType::Pointer &writer,
+                      const string &file,
+                      const LargeIntegerImageType::Pointer &out) {
+
+  writer->SetFileName(file + ".tif");
+  writer->SetInput(out);
+  try {
+    writer->Update();
+  }
+  catch (const itk::ExceptionObject &e) {
+    cerr << "ITK EXCEPTION:" << endl
+         << e << endl;
+  }
+}
+
+// RGB writer
+static void
+write_frame_rgb(RGBWriterType::Pointer &writer,
+                const string &file,
+                const RGBImageType::Pointer &out) {
 
   writer->SetFileName(file + ".tif");
   writer->SetInput(out);
@@ -256,19 +318,87 @@ double_threshold(HistogramType::Pointer &low_th_hist,
   }
 }
 
+
+/******************************************************************************/
+/* Watershed segmentation                                                     */
+/******************************************************************************/
+static void
+label_cells(const RealImageType::Pointer &in,
+            DistMapType::Pointer &dist_map,
+            InvertIntensityType::Pointer &in_inverter,
+            InvertIntensityType::Pointer &dist_inverter,
+            WatershedType::Pointer &watershed,
+            WatershedMaskType::Pointer &watershed_mask,
+            LargeIntegerImageType::Pointer &out,
+            const size_t VERBOSE = 0,
+            const string out_file_prefix = "") {
+  
+  // compute the distance map
+  in_inverter->SetInput(in);
+  dist_map->SetInput(in_inverter->GetOutput());
+  dist_inverter->SetInput(dist_map->GetOutput());
+  dist_inverter->Update();
+
+  // watershed the distance map
+  watershed->SetInput(dist_inverter->GetOutput());
+  
+  // mask out the background regions of watershed image 
+  watershed_mask->SetInput(watershed->GetOutput());
+  watershed_mask->SetMaskImage(in);
+  watershed_mask->Update();
+
+  out = watershed_mask->GetOutput(); 
+
+  // write and distance and label map on high verbosity
+  if (VERBOSE >= 2) {
+    constexpr size_t PixelMax = 
+      std::numeric_limits<IntegerPixelType>::max();
+    constexpr size_t PixelMin = 
+      std::numeric_limits<IntegerPixelType>::min();
+
+    RescalerType::Pointer debug_rescaler = RescalerType::New();
+    CastToIntegerType::Pointer debug_to_int =
+      CastToIntegerType::New();
+    WriterType::Pointer debug_writer = WriterType::New();
+    
+    // write distance map
+    debug_rescaler->SetOutputMinimum(PixelMin);
+    debug_rescaler->SetOutputMaximum(PixelMax);
+
+    debug_rescaler->SetInput(dist_inverter->GetOutput());
+    debug_to_int->SetInput(debug_rescaler->GetOutput());
+    write_frame(debug_writer, out_file_prefix + "_dist",
+                debug_to_int->GetOutput());
+ 
+    // write rgb label map
+    LabelOverlayType::Pointer debug_overlay = LabelOverlayType::New();
+    debug_overlay->SetInput(in);
+    debug_overlay->SetLabelImage(out);
+    debug_overlay->SetOpacity(0.3);
+    
+    RGBWriterType::Pointer debug_rgb_writer = RGBWriterType::New();
+    write_frame_rgb(debug_rgb_writer, out_file_prefix + "_rgb_label",
+                    debug_overlay->GetOutput());
+  }
+}
+
+
+/******************************************************************************/
+/* Main                                                                       */
+/******************************************************************************/
 int
 main (int argc, char *argv[]) {
   try {
     /**************************************************************************/
     /* Parse arguments                                                        */
     /**************************************************************************/
-    if (argc < 12) {
+    if (argc < 13) {
       cerr << argv[0]
            << " <in_dir> <out_dir> <sample_name>"
            << " <start_offset> <num_frames> " << endl
            << "\t<blur_iterations> <cell_frac> <low_th_offset>"
            << " <high_th_base_quantile> <high_th_ratio>" << endl
-           << "\t<verbose>" << endl;
+           << "\t<watershed_level> <verbose>" << endl;
       return EXIT_FAILURE;
     }    
 
@@ -285,7 +415,9 @@ main (int argc, char *argv[]) {
     const float high_th_base_quantile = std::stof(argv[9]);
     const float high_th_ratio = std::stof(argv[10]);
     
-    const size_t VERBOSE = std::stoi(argv[11]);
+    const float watershed_level = std::stof(argv[11]);
+
+    const size_t VERBOSE = std::stoi(argv[12]);
 
     const string in_format = "Tile%06d.tif";
     const string outfile_prefix = "mask%04d";
@@ -306,7 +438,7 @@ main (int argc, char *argv[]) {
     // Name genreators, readers, and writers
     NameGeneratorType::Pointer name_gen = NameGeneratorType::New();
     ReaderType::Pointer reader = ReaderType::New();
-    WriterType::Pointer writer = WriterType::New();
+    LargeIntegerWriterType::Pointer writer = LargeIntegerWriterType::New();
 
     // casters
     CastToRealType::Pointer to_real = CastToRealType::New();
@@ -354,6 +486,20 @@ main (int argc, char *argv[]) {
     ReconstructType::Pointer reconstructor = ReconstructType::New();
     reconstructor->SetBackgroundValue(PixelMin);
     reconstructor->SetForegroundValue(PixelMax);
+
+    // watershed related
+    DistMapType::Pointer ws_dist_map = DistMapType::New();
+    InvertIntensityType::Pointer ws_in_inverter = InvertIntensityType::New();
+    InvertIntensityType::Pointer ws_dist_inverter = InvertIntensityType::New();
+    ws_in_inverter->SetMaximum(PixelMax);
+    ws_dist_inverter->SetMaximum(PixelMax);
+
+    WatershedType::Pointer ws_watershed = WatershedType::New();
+    ws_watershed->SetLevel(watershed_level);
+    ws_watershed->SetFullyConnected(true);
+    ws_watershed->SetMarkWatershedLine(false);
+
+    WatershedMaskType::Pointer ws_mask = WatershedMaskType::New();
 
     // file_handlers
     ofstream stats_file(out_dir + sample_name + "stats.txt");
@@ -417,10 +563,14 @@ main (int argc, char *argv[]) {
                        reconstructor, double_th_frame,
                        stats_file, VERBOSE, out_dir + out_frame_files[i]);
 
-      // write the frame mask
-      to_int->SetInput(double_th_frame);
-      write_frame(writer, out_dir + out_frame_files[i],
-                  to_int->GetOutput());
+      // perfrom watershed
+      LargeIntegerImageType::Pointer label_mask;
+      label_cells(double_th_frame, ws_dist_map, ws_in_inverter,
+                  ws_dist_inverter, ws_watershed, ws_mask, label_mask,
+                  VERBOSE, out_dir + out_frame_files[i]);
+
+      // write label mask
+      write_frame_large_int(writer, out_dir + out_frame_files[i], label_mask);
 
       stats_file << endl;
     }
