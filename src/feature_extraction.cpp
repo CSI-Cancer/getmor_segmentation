@@ -21,6 +21,9 @@
 #include <string>
 #include <vector>
 
+/******************************************************************************/
+/* Type definitions                                                           */
+/******************************************************************************/
 using std::cout;
 using std::cerr;
 using std::endl;
@@ -28,10 +31,33 @@ using std::string;
 using std::vector;
 
 
+/******************************************************************************/
+/* Main                                                                       */
+/******************************************************************************/
 int
 main (int argc, char* argv[]) {
   try {
+    /**************************************************************************/
+    /* Parse arguments                                                        */
+    /**************************************************************************/
+    if (argc < 8) {
+      cerr << argv[0] 
+           << " <in_dir> <out_dir> <sample_name>"
+           << " <start_offset> <num_frames>" << endl
+           << "\t<num_channels> <channel_start>" << endl;
+      return EXIT_FAILURE;
+    }
 
+    const string in_dir = argv[1];
+    const string out_dir = argv[2];
+    const string sample_name = argv[3];
+    const size_t start_offset = std::stoi(argv[4]);
+    const size_t n_frames = std::stoi(argv[5]);
+
+    const size_t n_channels = std::stoi(argv[6]);
+    const string channel_start = argv[7];
+
+    const string in_format = "watershed%04d";
   } 
   catch (const std::exception &e) {
     cerr << "ERROR: " << endl;
