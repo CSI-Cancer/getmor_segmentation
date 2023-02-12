@@ -265,20 +265,20 @@ main (int argc, char *argv[]) {
       return EXIT_FAILURE;
     }    
 
-    string in_dir = argv[1];
-    string out_dir = argv[2];
-    string sample_name = argv[3];
-    size_t start_offset = std::stoi(argv[4]);
-    size_t n_frames = std::stoi(argv[5]);
+    const string in_dir = argv[1];
+    const string out_dir = argv[2];
+    const string sample_name = argv[3];
+    const size_t start_offset = std::stoi(argv[4]);
+    const size_t n_frames = std::stoi(argv[5]);
 
-    size_t blur_iterations = std::stoi(argv[6]);
+    const size_t blur_iterations = std::stoi(argv[6]);
 
-    float cell_frac_method = std::stof(argv[7]);
-    float low_th_offset = std::stof(argv[8]);
-    float high_th_base_quantile = std::stof(argv[9]);
-    float high_th_ratio = std::stof(argv[10]);
+    const float cell_frac_method = std::stof(argv[7]);
+    const float low_th_offset = std::stof(argv[8]);
+    const float high_th_base_quantile = std::stof(argv[9]);
+    const float high_th_ratio = std::stof(argv[10]);
     
-    size_t VERBOSE = std::stoi(argv[11]);
+    const size_t VERBOSE = std::stoi(argv[11]);
 
     const string in_format = "Tile%06d.tif";
     const string outfile_prefix = "mask%04d";
