@@ -17,7 +17,6 @@
 */
 
 #include <iostream>
-#include <unistd.h>
 #include <sstream>
 #include <fstream>
 #include <string>
@@ -250,85 +249,40 @@ double_threshold(HistogramType::Pointer &low_th_hist,
   }
 }
 
-/******************************************************************************/
-/* Parse arguments                                                            */
-/******************************************************************************/
-static string
-print_usage (const string &name) {
-  std::ostringstream oss;
-  oss << name << " [options]" << endl
-      << "\t-i input dir [required]" << endl
-      << "\t-o output dir [required]" << endl
-      << "\t-f input frame format [default: \"Tile%06d.tif\"]" << endl
-      << "\t-p outfile prefix [default: \"mask%04d\"]" << endl
-      << "\t-s start offset [default: 0]" << endl
-      << "\t-n number of frames [default: 2304]" << endl
-      << "\t-t sample name [default: \"\"]" << endl
-      << "\t-b blur: number of iterations [default: 5]" << endl
-      << "\t-m threshold: low th quantile method [default: 0.995]" << endl
-      << "\t-l threshold: low threshold offset [default: 0]" << endl
-      << "\t-q threshold: upper threshold base quantile [default: 0.5]" << endl
-      << "\t-r threshold: upper threshold ratio [default: 2]" << endl
-      << "\t-v verbosity level (0, 1, 2) [default: 0]" << endl;
-  return oss.str();
-}
-
 int
 main (int argc, char *argv[]) {
   try {
+    /**************************************************************************/
+    /* Parse arguments                                                        */
+    /**************************************************************************/
+    if (argc < 12) {
+      cerr << argv[0]
+           << " <in_dir> <out_dir> <sample_name>"
+           << " <start_offset> <num_frames> " << endl
+           << "\t<blur_iterations> <cell_frac> <low_th_offset>"
+           << " <high_th_base_quantile> <high_th_ratio>" << endl
+           << "\t<verbose>" << endl;
+      return EXIT_FAILURE;
+    }    
 
-    string in_dir;
-    string in_format = "Tile%06d.tif";
-    string out_dir;
-    string outfile_prefix = "mask%04d";
-    string sample_name;
-    size_t start_offset = 0;
-    size_t n_frames = 1;
-    size_t VERBOSE = 0;
+    string in_dir = argv[1];
+    string out_dir = argv[2];
+    string sample_name = argv[3];
+    size_t start_offset = std::stoi(argv[4]);
+    size_t n_frames = std::stoi(argv[5]);
 
-    size_t blur_iterations = 5;
+    size_t blur_iterations = std::stoi(argv[6]);
 
-    float cell_frac_method = 0.995;
-    float low_th_offset = 0;
-    float high_th_base_quantile = 0.5;
-    float high_th_ratio = 2;
+    float cell_frac_method = std::stof(argv[7]);
+    float low_th_offset = std::stof(argv[8]);
+    float high_th_base_quantile = std::stof(argv[9]);
+    float high_th_ratio = std::stof(argv[10]);
+    
+    size_t VERBOSE = std::stoi(argv[11]);
 
-    int opt;
-    while ((opt = getopt(argc, argv, "i:f:o:p:t:s:n:b:m:l:q:r:v:")) != -1) {
-      if (opt == 'i')
-        in_dir = optarg;
-      else if (opt == 'f')
-        in_format = optarg;
-      else if (opt == 'o')
-        out_dir = optarg;
-      else if (opt == 'p')
-        outfile_prefix = optarg;
-      else if (opt == 's')
-        start_offset = std::stoi(optarg);
-      else if (opt == 'n')
-        n_frames = std::stoi(optarg);
-      else if (opt == 't')
-        sample_name = optarg;
-      else if (opt == 'b')
-        blur_iterations = std::stoi(optarg);
-      else if (opt == 'm')
-        cell_frac_method = std::stof(optarg);
-      else if (opt == 'l')
-        low_th_offset = std::stof(optarg);
-      else if (opt == 'q')
-        high_th_base_quantile = std::stof(optarg);
-      else if (opt == 'r')
-        high_th_ratio = std::stof(optarg);
-      else if (opt == 'v')
-        VERBOSE = std::stoi(optarg);
-      else
-        throw std::runtime_error(print_usage(argv[0]));
-    }
-
-    if (in_dir.empty() || out_dir.empty()) {
-      throw std::runtime_error(print_usage(argv[0]));
-    }
-
+    const string in_format = "Tile%06d.tif";
+    const string outfile_prefix = "mask%04d";
+    
     /**************************************************************************/
     /* Initialize filters                                                     */
     /**************************************************************************/
