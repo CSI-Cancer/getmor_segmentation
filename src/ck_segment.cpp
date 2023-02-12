@@ -420,7 +420,7 @@ main (int argc, char *argv[]) {
     const size_t VERBOSE = std::stoi(argv[12]);
 
     const string in_format = "Tile%06d.tif";
-    const string outfile_prefix = "mask%04d";
+    const string outfile_prefix = "watershed%04d";
     
     /**************************************************************************/
     /* Initialize filters                                                     */
