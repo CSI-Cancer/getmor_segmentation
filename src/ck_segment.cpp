@@ -44,12 +44,6 @@
 #include "itkMaskedImageToHistogramFilter.h"
 #include "itkBinaryReconstructionByDilationImageFilter.h"
 
-#include "itkLabelOverlayImageFilter.h"
-#include "itkInvertIntensityImageFilter.h"
-#include "itkRescaleIntensityImageFilter.h"
-#include "itkDanielssonDistanceMapImageFilter.h"
-#include "itkMorphologicalWatershedImageFilter.h"
-
 #include "itkConnectedComponentImageFilter.h"
 #include "itkLabelToRGBImageFilter.h"
 
@@ -99,22 +93,6 @@ using BinaryThType =
 using ReconstructType =
   itk::BinaryReconstructionByDilationImageFilter<RealImageType>;
 
-using DistMapType = 
-  itk::DanielssonDistanceMapImageFilter<RealImageType, RealImageType>;
-using InvertIntensityType =
-  itk::InvertIntensityImageFilter<RealImageType, RealImageType>;
-using WatershedType = 
-  itk::MorphologicalWatershedImageFilter<RealImageType, 
-                                         LargeIntegerImageType>;
-using WatershedMaskType = itk::MaskImageFilter<LargeIntegerImageType,
-                                               RealImageType,
-                                               LargeIntegerImageType>;
-
-using RescalerType = 
-  itk::RescaleIntensityImageFilter<RealImageType, RealImageType>;
-using LabelOverlayType = itk::LabelOverlayImageFilter<RealImageType,
-                                                      LargeIntegerImageType,
-                                                      RGBImageType>;
 using ConnectedComponentType = 
   itk::ConnectedComponentImageFilter<IntegerImageType, LargeIntegerImageType>;
 using LabelToRGBType = itk::LabelToRGBImageFilter<LargeIntegerImageType,
@@ -354,67 +332,6 @@ label_cells(const IntegerImageType::Pointer &in,
   }
 } 
 
-// watershed
-static void
-label_cells(const RealImageType::Pointer &in,
-            DistMapType::Pointer &dist_map,
-            InvertIntensityType::Pointer &in_inverter,
-            InvertIntensityType::Pointer &dist_inverter,
-            WatershedType::Pointer &watershed,
-            WatershedMaskType::Pointer &watershed_mask,
-            LargeIntegerImageType::Pointer &out,
-            const size_t VERBOSE = 0,
-            const string out_file_prefix = "") {
-  
-  // compute the distance map
-  in_inverter->SetInput(in);
-  dist_map->SetInput(in_inverter->GetOutput());
-  dist_inverter->SetInput(dist_map->GetOutput());
-  dist_inverter->Update();
-
-  // watershed the distance map
-  watershed->SetInput(dist_inverter->GetOutput());
-  
-  // mask out the background regions of watershed image 
-  watershed_mask->SetInput(watershed->GetOutput());
-  watershed_mask->SetMaskImage(in);
-  watershed_mask->Update();
-
-  out = watershed_mask->GetOutput(); 
-
-  // write and distance and label map on high verbosity
-  if (VERBOSE >= 2) {
-    constexpr size_t PixelMax = 
-      std::numeric_limits<IntegerPixelType>::max();
-    constexpr size_t PixelMin = 
-      std::numeric_limits<IntegerPixelType>::min();
-
-    RescalerType::Pointer debug_rescaler = RescalerType::New();
-    CastToIntegerType::Pointer debug_to_int =
-      CastToIntegerType::New();
-    WriterType::Pointer debug_writer = WriterType::New();
-    
-    // write distance map
-    debug_rescaler->SetOutputMinimum(PixelMin);
-    debug_rescaler->SetOutputMaximum(PixelMax);
-
-    debug_rescaler->SetInput(dist_inverter->GetOutput());
-    debug_to_int->SetInput(debug_rescaler->GetOutput());
-    write_frame(debug_writer, out_file_prefix + "_dist",
-                debug_to_int->GetOutput());
- 
-    // write rgb label map
-    LabelOverlayType::Pointer debug_overlay = LabelOverlayType::New();
-    debug_overlay->SetInput(in);
-    debug_overlay->SetLabelImage(out);
-    debug_overlay->SetOpacity(0.3);
-    
-    RGBWriterType::Pointer debug_rgb_writer = RGBWriterType::New();
-    write_frame_rgb(debug_rgb_writer, out_file_prefix + "_rgb_label",
-                    debug_overlay->GetOutput());
-  }
-}
-
 
 /******************************************************************************/
 /* Main                                                                       */
@@ -425,13 +342,13 @@ main (int argc, char *argv[]) {
     /**************************************************************************/
     /* Parse arguments                                                        */
     /**************************************************************************/
-    if (argc < 13) {
+    if (argc != 12) {
       cerr << argv[0]
            << " <in_dir> <out_dir> <sample_name>"
            << " <start_offset> <num_frames> " << endl
            << "\t<blur_iterations> <cell_frac> <low_th_offset>"
            << " <high_th_base_quantile> <high_th_ratio>" << endl
-           << "\t<watershed_level> <verbose>" << endl;
+           << "\t<verbose>" << endl;
       return EXIT_FAILURE;
     }    
 
@@ -448,9 +365,7 @@ main (int argc, char *argv[]) {
     const float high_th_base_quantile = std::stof(argv[9]);
     const float high_th_ratio = std::stof(argv[10]);
     
-    const float watershed_level = std::stof(argv[11]);
-
-    const size_t VERBOSE = std::stoi(argv[12]);
+    const size_t VERBOSE = std::stoi(argv[11]);
 
     const string in_format = "Tile%06d.tif";
     const string outfile_prefix = "label%04d";
@@ -525,20 +440,6 @@ main (int argc, char *argv[]) {
       ConnectedComponentType::New();
     connected_comp->SetFullyConnected(true);
 
-    // watershed related
-    DistMapType::Pointer ws_dist_map = DistMapType::New();
-    InvertIntensityType::Pointer ws_in_inverter = InvertIntensityType::New();
-    InvertIntensityType::Pointer ws_dist_inverter = InvertIntensityType::New();
-    ws_in_inverter->SetMaximum(PixelMax);
-    ws_dist_inverter->SetMaximum(PixelMax);
-
-    WatershedType::Pointer ws_watershed = WatershedType::New();
-    ws_watershed->SetLevel(watershed_level);
-    ws_watershed->SetFullyConnected(true);
-    ws_watershed->SetMarkWatershedLine(false);
-
-    WatershedMaskType::Pointer ws_mask = WatershedMaskType::New();
-
     // file_handlers
     ofstream stats_file(out_dir + sample_name + "_stats.txt");
 
@@ -606,13 +507,7 @@ main (int argc, char *argv[]) {
       to_int->SetInput(double_th_frame);
       label_cells(to_int->GetOutput(), connected_comp, label_mask,
                   VERBOSE, out_dir + out_frame_files[i]);
-/*
-      // perfrom watershed
-      label_cells(double_th_frame, ws_dist_map, ws_in_inverter,
-                  ws_dist_inverter, ws_watershed, ws_mask, label_mask,
-                  VERBOSE, out_dir + out_frame_files[i]);
-*/
-
+       
       // write label mask
       write_frame_large_int(writer, out_dir + out_frame_files[i], label_mask);
 
