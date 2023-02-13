@@ -50,6 +50,9 @@
 #include "itkDanielssonDistanceMapImageFilter.h"
 #include "itkMorphologicalWatershedImageFilter.h"
 
+#include "itkConnectedComponentImageFilter.h"
+#include "itkLabelToRGBImageFilter.h"
+
 /******************************************************************************/
 /* Type definitions                                                           */
 /******************************************************************************/
@@ -112,6 +115,10 @@ using RescalerType =
 using LabelOverlayType = itk::LabelOverlayImageFilter<RealImageType,
                                                       LargeIntegerImageType,
                                                       RGBImageType>;
+using ConnectedComponentType = 
+  itk::ConnectedComponentImageFilter<IntegerImageType, LargeIntegerImageType>;
+using LabelToRGBType = itk::LabelToRGBImageFilter<LargeIntegerImageType,
+                                                  RGBImageType>;
 
 /******************************************************************************/
 /* Reader and writer                                                          */
@@ -320,8 +327,34 @@ double_threshold(HistogramType::Pointer &low_th_hist,
 
 
 /******************************************************************************/
-/* Watershed segmentation                                                     */
+/* Label cells                                                                */
 /******************************************************************************/
+// connected components
+static void
+label_cells(const IntegerImageType::Pointer &in,
+            ConnectedComponentType::Pointer &connected_comp,
+            LargeIntegerImageType::Pointer &out,
+            const size_t VERBOSE = 0,
+            const string out_file_prefix = "") {
+
+  connected_comp->SetInput(in);
+  connected_comp->Update();
+  
+  out = connected_comp->GetOutput();
+  
+  // write label map on high verbosity
+  if (VERBOSE >= 2) {
+    // write rgb label map
+    LabelToRGBType::Pointer debug_label_to_rgb = LabelToRGBType::New();
+    debug_label_to_rgb->SetInput(out);
+ 
+    RGBWriterType::Pointer debug_rgb_writer = RGBWriterType::New();
+    write_frame_rgb(debug_rgb_writer, out_file_prefix + "_rgb_label",
+                    debug_label_to_rgb->GetOutput());
+  }
+} 
+
+// watershed
 static void
 label_cells(const RealImageType::Pointer &in,
             DistMapType::Pointer &dist_map,
@@ -420,7 +453,7 @@ main (int argc, char *argv[]) {
     const size_t VERBOSE = std::stoi(argv[12]);
 
     const string in_format = "Tile%06d.tif";
-    const string outfile_prefix = "watershed%04d";
+    const string outfile_prefix = "label%04d";
     
     /**************************************************************************/
     /* Initialize filters                                                     */
@@ -487,6 +520,11 @@ main (int argc, char *argv[]) {
     reconstructor->SetBackgroundValue(PixelMin);
     reconstructor->SetForegroundValue(PixelMax);
 
+    // connected component related
+    ConnectedComponentType::Pointer connected_comp = 
+      ConnectedComponentType::New();
+    connected_comp->SetFullyConnected(true);
+
     // watershed related
     DistMapType::Pointer ws_dist_map = DistMapType::New();
     InvertIntensityType::Pointer ws_in_inverter = InvertIntensityType::New();
@@ -502,7 +540,7 @@ main (int argc, char *argv[]) {
     WatershedMaskType::Pointer ws_mask = WatershedMaskType::New();
 
     // file_handlers
-    ofstream stats_file(out_dir + sample_name + "stats.txt");
+    ofstream stats_file(out_dir + sample_name + "_stats.txt");
 
     /**************************************************************************/
     /* Generate file names                                                    */
@@ -563,11 +601,17 @@ main (int argc, char *argv[]) {
                        reconstructor, double_th_frame,
                        stats_file, VERBOSE, out_dir + out_frame_files[i]);
 
-      // perfrom watershed
       LargeIntegerImageType::Pointer label_mask;
+      // get connected components
+      to_int->SetInput(double_th_frame);
+      label_cells(to_int->GetOutput(), connected_comp, label_mask,
+                  VERBOSE, out_dir + out_frame_files[i]);
+/*
+      // perfrom watershed
       label_cells(double_th_frame, ws_dist_map, ws_in_inverter,
                   ws_dist_inverter, ws_watershed, ws_mask, label_mask,
                   VERBOSE, out_dir + out_frame_files[i]);
+*/
 
       // write label mask
       write_frame_large_int(writer, out_dir + out_frame_files[i], label_mask);
