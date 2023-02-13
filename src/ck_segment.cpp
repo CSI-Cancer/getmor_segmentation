@@ -16,12 +16,6 @@
 * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-/*
-* This program is essenatlly 'single_channel_mask.cpp' and 
-* 'marge_and_watershed.cpp' in one program for use when segmenting just
-* using the CK channel. Larger portions of code are repeated, but doing it
-* this way for ease. 
-*/
 
 #include <iostream>
 #include <sstream>
@@ -93,7 +87,7 @@ using BinaryThType =
 using ReconstructType =
   itk::BinaryReconstructionByDilationImageFilter<RealImageType>;
 
-using ConnectedComponentType = 
+using ConnectedComponentType =
   itk::ConnectedComponentImageFilter<IntegerImageType, LargeIntegerImageType>;
 using LabelToRGBType = itk::LabelToRGBImageFilter<LargeIntegerImageType,
                                                   RGBImageType>;
@@ -317,20 +311,20 @@ label_cells(const IntegerImageType::Pointer &in,
 
   connected_comp->SetInput(in);
   connected_comp->Update();
-  
+
   out = connected_comp->GetOutput();
-  
+
   // write label map on high verbosity
   if (VERBOSE >= 2) {
     // write rgb label map
     LabelToRGBType::Pointer debug_label_to_rgb = LabelToRGBType::New();
     debug_label_to_rgb->SetInput(out);
- 
+
     RGBWriterType::Pointer debug_rgb_writer = RGBWriterType::New();
     write_frame_rgb(debug_rgb_writer, out_file_prefix + "_rgb_label",
                     debug_label_to_rgb->GetOutput());
   }
-} 
+}
 
 
 /******************************************************************************/
@@ -350,7 +344,7 @@ main (int argc, char *argv[]) {
            << " <high_th_base_quantile> <high_th_ratio>" << endl
            << "\t<verbose>" << endl;
       return EXIT_FAILURE;
-    }    
+    }
 
     const string in_dir = argv[1];
     const string out_dir = argv[2];
@@ -364,12 +358,12 @@ main (int argc, char *argv[]) {
     const float low_th_offset = std::stof(argv[8]);
     const float high_th_base_quantile = std::stof(argv[9]);
     const float high_th_ratio = std::stof(argv[10]);
-    
+
     const size_t VERBOSE = std::stoi(argv[11]);
 
     const string in_format = "Tile%06d.tif";
-    const string outfile_prefix = "label%04d";
-    
+    const string outfile_prefix = "label%06d";
+
     /**************************************************************************/
     /* Initialize filters                                                     */
     /**************************************************************************/
@@ -436,7 +430,7 @@ main (int argc, char *argv[]) {
     reconstructor->SetForegroundValue(PixelMax);
 
     // connected component related
-    ConnectedComponentType::Pointer connected_comp = 
+    ConnectedComponentType::Pointer connected_comp =
       ConnectedComponentType::New();
     connected_comp->SetFullyConnected(true);
 
@@ -507,7 +501,7 @@ main (int argc, char *argv[]) {
       to_int->SetInput(double_th_frame);
       label_cells(to_int->GetOutput(), connected_comp, label_mask,
                   VERBOSE, out_dir + out_frame_files[i]);
-       
+
       // write label mask
       write_frame_large_int(writer, out_dir + out_frame_files[i], label_mask);
 

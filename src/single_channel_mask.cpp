@@ -263,7 +263,7 @@ main (int argc, char *argv[]) {
            << " <high_th_base_quantile> <high_th_ratio>" << endl
            << "\t<verbose>" << endl;
       return EXIT_FAILURE;
-    }    
+    }
 
     const string in_dir = argv[1];
     const string out_dir = argv[2];
@@ -277,12 +277,12 @@ main (int argc, char *argv[]) {
     const float low_th_offset = std::stof(argv[8]);
     const float high_th_base_quantile = std::stof(argv[9]);
     const float high_th_ratio = std::stof(argv[10]);
-    
+
     const size_t VERBOSE = std::stoi(argv[11]);
 
     const string in_format = "Tile%06d.tif";
-    const string outfile_prefix = "mask%04d";
-    
+    const string outfile_prefix = "mask%06d";
+
     /**************************************************************************/
     /* Initialize filters                                                     */
     /**************************************************************************/
@@ -349,7 +349,7 @@ main (int argc, char *argv[]) {
     reconstructor->SetForegroundValue(PixelMax);
 
     // file_handlers
-    ofstream stats_file(out_dir + sample_name + "stats.txt");
+    ofstream stats_file(out_dir + sample_name + "_stats.txt");
 
     /**************************************************************************/
     /* Generate file names                                                    */

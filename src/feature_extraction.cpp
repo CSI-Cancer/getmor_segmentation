@@ -51,11 +51,11 @@ using LargeIntegerReaderType = itk::ImageFileReader<LargeIntegerImageType>;
 
 using LabelStatsType = itk::LabelStatisticsImageFilter<IntegerImageType,
                                                        LargeIntegerImageType>;
-using ShapeLabelObjectType = itk::ShapeLabelObject<LargeIntegerPixelType, 
+using ShapeLabelObjectType = itk::ShapeLabelObject<LargeIntegerPixelType,
                                                    Dimension>;
 using ShapeLabelMapType = itk::LabelMap<ShapeLabelObjectType>;
-using LabelShapeType = 
-  itk::LabelImageToShapeLabelMapFilter<LargeIntegerImageType, 
+using LabelShapeType =
+  itk::LabelImageToShapeLabelMapFilter<LargeIntegerImageType,
                                        ShapeLabelMapType>;
 
 
@@ -206,7 +206,7 @@ main (int argc, char* argv[]) {
     /* Parse arguments                                                        */
     /**************************************************************************/
     if (argc < 7) {
-      cerr << argv[0] 
+      cerr << argv[0]
            << " <frame_dir> <label_dir> <sample_name>"
            << " <start_offset> <num_frames> <channel_start>" << endl;
       return EXIT_FAILURE;
@@ -223,23 +223,23 @@ main (int argc, char* argv[]) {
     csv_to_uint(channel_start_str, channel_start);
     const size_t n_channels = channel_start.size();
 
-    const string label_format = "watershed%04d.tif";
+    const string label_format = "label%06d.tif";
     const string frame_format = "Tile%06d.tif";
 
     /**************************************************************************/
     /* Initialize filters                                                     */
     /**************************************************************************/
-    
+
     // Name genreators, readers, and writers
     NameGeneratorType::Pointer name_gen = NameGeneratorType::New();
     ReaderType::Pointer reader = ReaderType::New();
-    LargeIntegerReaderType::Pointer reader_large_int = 
-      LargeIntegerReaderType::New(); 
+    LargeIntegerReaderType::Pointer reader_large_int =
+      LargeIntegerReaderType::New();
 
     // feature extraction
     LabelStatsType::Pointer feature_intensity_stats = LabelStatsType::New();
     LabelShapeType::Pointer feature_shape_stats = LabelShapeType::New();
- 
+
     // file handlers
     ofstream features_file(label_dir + sample_name + "_feature_vec.txt");
 
@@ -254,7 +254,7 @@ main (int argc, char* argv[]) {
 
     vector<string> label_files;
     label_files = name_gen->GetFileNames();
-    
+
     // scanned frame file names
     vector<vector<string>> in_frame_files;
     for (size_t i = 0; i < n_channels; ++i) {
@@ -262,10 +262,10 @@ main (int argc, char* argv[]) {
       name_gen->SetStartIndex(channel_start[i]);
       name_gen->SetEndIndex(channel_start[i] + n_frames - 1);
       name_gen->SetIncrementIndex(1);
-    
-      in_frame_files.push_back(name_gen->GetFileNames());  
+
+      in_frame_files.push_back(name_gen->GetFileNames());
     }
-    
+
     /**************************************************************************/
     /* Process frames                                                         */
     /**************************************************************************/
@@ -273,36 +273,36 @@ main (int argc, char* argv[]) {
 
       // read label
       LargeIntegerImageType::Pointer in_label;
-      read_img(reader_large_int, frame_dir + label_files[i], in_label);
+      read_img(reader_large_int, label_dir + label_files[i], in_label);
 
       // generate shape features
       // feature extraction
       vector<vector<float>> feature_vector;
       shape_features(in_label, feature_shape_stats, feature_vector);
-  
+
       // generate intensity features for each channel
       for (size_t j = 0; j < n_channels; ++j) {
         IntegerImageType::Pointer in_frame;
-        read_img(reader, label_dir + in_frame_files[j][i], in_frame);
+        read_img(reader, frame_dir + in_frame_files[j][i], in_frame);
         intensity_features(in_frame, in_label,
                            feature_intensity_stats, feature_vector);
-      
+
       }
 
       // write feature vector to file
       features_file << format_feature_vector(start_offset + i, feature_vector);
     }
-  
+
     /**************************************************************************/
     /* Clean-up and exit                                                      */
     /**************************************************************************/
     features_file.close();
 
-  } 
+  }
   catch (const std::exception &e) {
     cerr << "ERROR: " << endl;
     cerr << e.what() << endl;
     return EXIT_FAILURE;
-  } 
+  }
   return EXIT_SUCCESS;
 }

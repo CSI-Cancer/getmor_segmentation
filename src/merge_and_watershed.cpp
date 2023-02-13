@@ -65,23 +65,23 @@ using WriterType = itk::ImageFileWriter<IntegerImageType>;
 using LargeIntegerWriterType = itk::ImageFileWriter<LargeIntegerImageType>;
 using RGBWriterType = itk::ImageFileWriter<RGBImageType>;
 
-using CastToRealType = 
+using CastToRealType =
   itk::CastImageFilter<IntegerImageType, RealImageType>;
 using CastToIntegerType =
   itk::CastImageFilter<RealImageType, IntegerImageType>;
 
-using DistMapType = 
+using DistMapType =
   itk::DanielssonDistanceMapImageFilter<RealImageType, RealImageType>;
 using InvertIntensityType =
   itk::InvertIntensityImageFilter<RealImageType, RealImageType>;
-using WatershedType = 
-  itk::MorphologicalWatershedImageFilter<RealImageType, 
+using WatershedType =
+  itk::MorphologicalWatershedImageFilter<RealImageType,
                                          LargeIntegerImageType>;
 using WatershedMaskType = itk::MaskImageFilter<LargeIntegerImageType,
                                                RealImageType,
                                                LargeIntegerImageType>;
 
-using RescalerType = 
+using RescalerType =
   itk::RescaleIntensityImageFilter<RealImageType, RealImageType>;
 using LabelOverlayType = itk::LabelOverlayImageFilter<RealImageType,
                                                       LargeIntegerImageType,
@@ -170,7 +170,7 @@ label_cells(const RealImageType::Pointer &in,
             LargeIntegerImageType::Pointer &out,
             const size_t VERBOSE = 0,
             const string out_file_prefix = "") {
-  
+
   // compute the distance map
   in_inverter->SetInput(in);
   dist_map->SetInput(in_inverter->GetOutput());
@@ -179,26 +179,26 @@ label_cells(const RealImageType::Pointer &in,
 
   // watershed the distance map
   watershed->SetInput(dist_inverter->GetOutput());
-  
-  // mask out the background regions of watershed image 
+
+  // mask out the background regions of watershed image
   watershed_mask->SetInput(watershed->GetOutput());
   watershed_mask->SetMaskImage(in);
   watershed_mask->Update();
 
-  out = watershed_mask->GetOutput(); 
+  out = watershed_mask->GetOutput();
 
   // write and distance and label map on high verbosity
   if (VERBOSE >= 2) {
-    constexpr size_t PixelMax = 
+    constexpr size_t PixelMax =
       std::numeric_limits<IntegerPixelType>::max();
-    constexpr size_t PixelMin = 
+    constexpr size_t PixelMin =
       std::numeric_limits<IntegerPixelType>::min();
 
     RescalerType::Pointer debug_rescaler = RescalerType::New();
     CastToIntegerType::Pointer debug_to_int =
       CastToIntegerType::New();
     WriterType::Pointer debug_writer = WriterType::New();
-    
+
     // write distance map
     debug_rescaler->SetOutputMinimum(PixelMin);
     debug_rescaler->SetOutputMaximum(PixelMax);
@@ -207,13 +207,13 @@ label_cells(const RealImageType::Pointer &in,
     debug_to_int->SetInput(debug_rescaler->GetOutput());
     write_frame(debug_writer, out_file_prefix + "_dist",
                 debug_to_int->GetOutput());
- 
+
     // write rgb label map
     LabelOverlayType::Pointer debug_overlay = LabelOverlayType::New();
     debug_overlay->SetInput(in);
     debug_overlay->SetLabelImage(out);
     debug_overlay->SetOpacity(0.3);
-    
+
     RGBWriterType::Pointer debug_rgb_writer = RGBWriterType::New();
     write_frame_rgb(debug_rgb_writer, out_file_prefix + "_rgb_label",
                     debug_overlay->GetOutput());
@@ -233,24 +233,24 @@ main (int argc, char* argv[]) {
     if (argc < 7) {
       cerr << argv[0]
            << " <in_dir> <out_dir>"
-           << " <start_offset> <num_frames> <watershed_level>" 
+           << " <start_offset> <num_frames> <watershed_level>"
            << " <verbose>" << endl;
       return EXIT_FAILURE;
     }
-    
+
     const string in_dir = argv[1];
     const string out_dir = argv[2];
 
     const size_t start_offset = std::stoi(argv[3]);
-    const size_t n_frames = std::stoi(argv[4]);  
+    const size_t n_frames = std::stoi(argv[4]);
 
-    const float watershed_level = std::stof(argv[5]); 
-  
+    const float watershed_level = std::stof(argv[5]);
+
     const size_t VERBOSE = std::stoi(argv[6]);
 
-    const string in_format = "mask%04d.tif";
-    const string outfile_prefix = "watershed%04d";
-   
+    const string in_format = "mask%06d.tif";
+    const string outfile_prefix = "label%06d";
+
     /**************************************************************************/
     /* Initialize filters                                                     */
     /**************************************************************************/
@@ -260,7 +260,7 @@ main (int argc, char* argv[]) {
     // constants
     constexpr size_t PixelMax =
       std::numeric_limits<IntegerPixelType>::max();
-    
+
     // Name genreators, readers, and writers
     NameGeneratorType::Pointer name_gen = NameGeneratorType::New();
     ReaderType::Pointer reader = ReaderType::New();
@@ -303,7 +303,7 @@ main (int argc, char* argv[]) {
 
     vector<string> out_frame_files;
     out_frame_files = name_gen->GetFileNames();
-    
+
     /**************************************************************************/
     /* Process frames                                                         */
     /**************************************************************************/
@@ -340,7 +340,7 @@ main (int argc, char* argv[]) {
   catch (const std::exception &e) {
     cerr << "ERROR: " << endl;
     cerr << e.what() << endl;
-    return EXIT_FAILURE; 
+    return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
 }
