@@ -22,3 +22,6 @@ target_link_libraries(feature_extraction ${ITK_LIBRARIES})
 
 add_executable(cell_image cell_image.cpp)
 target_link_libraries(cell_image ${ITK_LIBRARIES})
+
+add_executable(gain gain.cpp)
+target_link_libraries(gain ${ITK_LIBRARIES})
