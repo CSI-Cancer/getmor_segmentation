@@ -8,14 +8,17 @@ include(${ITK_USE_FILE})
 
 set(CMAKE_CXX_FLAGS "-Wall -O2")
 
+add_executable(ck_segment ck_segment.cpp)
+target_link_libraries(ck_segment ${ITK_LIBRARIES})
+
 add_executable(single_channel_mask single_channel_mask.cpp)
 target_link_libraries(single_channel_mask ${ITK_LIBRARIES})
 
 add_executable(merge_and_watershed merge_and_watershed.cpp)
 target_link_libraries(merge_and_watershed ${ITK_LIBRARIES})
 
-add_executable(ck_segment ck_segment.cpp)
-target_link_libraries(ck_segment ${ITK_LIBRARIES})
-
 add_executable(feature_extraction feature_extraction.cpp)
 target_link_libraries(feature_extraction ${ITK_LIBRARIES})
+
+add_executable(cell_image cell_image.cpp)
+target_link_libraries(cell_image ${ITK_LIBRARIES})
