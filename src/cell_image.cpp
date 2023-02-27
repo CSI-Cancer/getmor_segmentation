@@ -107,6 +107,23 @@ csv_to_uint(const string &in,
   tokens.push_back(std::stoi(in.substr(pos)));
 }
 
+static void
+split_string(const string &in,
+             vector<string> &tokens,
+             const char delim = '\t') {
+
+  tokens.clear();
+  size_t pos = 0;
+  size_t next_pos = in.find(delim);
+  while (next_pos != string::npos) {
+    tokens.push_back(in.substr(pos, next_pos - pos));
+    pos = ++next_pos;
+    next_pos = in.find(delim, pos);
+  }
+  tokens.push_back(in.substr(pos));
+}
+
+
 /******************************************************************************/
 /* Main                                                                       */
 /******************************************************************************/
@@ -116,11 +133,10 @@ main (int argc, char* argv[]) {
     /**************************************************************************/
     /* Parse arguments                                                        */
     /**************************************************************************/
-    if (argc != 10) {
+    if (argc != 7) {
       cerr << argv[0]
            << " <frame_dir> <out_dir> <cell_list_file>" << endl
-           << "\t<ch_use_vector> <red_start> <green_start>"
-           << " <blue_start> <white_start> <out_frame_size>" << endl;
+           << "\t<ch_use_vector> <ch_start_offset> <out_frame_size>" << endl;
       return EXIT_FAILURE;
     }
 
@@ -131,17 +147,17 @@ main (int argc, char* argv[]) {
     const string ch_to_use_str = argv[4];
     vector<size_t> ch_to_use;
     csv_to_uint(ch_to_use_str, ch_to_use);
-    if (ch_to_use.size() != 4) {
-      cerr << "ERROR: ch_use_vector must of length 4" << endl;
+   
+    const string ch_start_str = argv[5];
+    vector<size_t> ch_start; 
+    csv_to_uint(ch_start_str, ch_start);
+    if ((ch_to_use.size()) != 4 || (ch_start.size() != 4)) {
+      cerr << "ERROR: ch_use_vector and ch_start_offset must of length 4" 
+           << endl;
       return EXIT_FAILURE;
     }
-    
 
-    const size_t red_start = std::stoi(argv[5]);
-    const size_t green_start = std::stoi(argv[6]);
-    const size_t blue_start = std::stoi(argv[7]);
-    const size_t white_start = std::stoi(argv[8]);
-    const size_t frame_len = std::stoi(argv[9]); 
+    const size_t frame_len = std::stoi(argv[6]); 
 
     const string in_format = "Tile%06d.tif";
 
@@ -216,16 +232,91 @@ main (int argc, char* argv[]) {
     rgb_img->SetSpacing(rgb_spacing);
     rgb_img->SetRegions(rgb_region);
     rgb_img->Allocate();
-      
-
  
  
 
     /**************************************************************************/
     /* Process frames                                                         */
     /**************************************************************************/
+    std::ifstream cell_list(cell_list_file);
+    if (!cell_list) {
+      cerr << "Cannot open " + cell_list_file << endl;
+      return EXIT_FAILURE;
+    }
 
+    string line;    
+    while (getline(cell_list, line)) {
+      // parse cell info
+      vector<string> tokens;
+      split_string(line, tokens);
+      size_t frame_id = std::stoi(tokens[0]);
+      size_t cell_id = std::stoi(tokens[1]);
+      size_t cell_x = std::round(std::stof(tokens[2]));
+      size_t cell_y = std::round(std::stof(tokens[3]));    
+     
+      // zero out the output images
+      tile_img->FillBuffer(0);
+      rgb_img->FillBuffer(RGBPixelType{});
 
+      for (size_t i = 0; i < 4; ++i) {
+        if (ch_to_use[i]) {
+          // read input image
+          name_gen->SetSeriesFormat(in_format);
+          name_gen->SetStartIndex(frame_id + ch_start[i]);
+          name_gen->SetEndIndex(frame_id + ch_start[i]);
+         
+          IntegerImageType::Pointer in_frame;  
+          read_frame(reader, frame_dir + name_gen->GetFileNames()[0], 
+                     in_frame); 
+ 
+          // define region in inpput image
+          IntegerImageType::RegionType crop_region;
+          IntegerImageType::RegionType::IndexType crop_index;
+          IntegerImageType::RegionType::SizeType crop_size;
+
+          // set the crop start index
+          if ((cell_x - (frame_len / 2)) > 0) {
+            crop_index[0] = cell_x - (frame_len / 2);
+          }
+          else {
+            crop_index[0] = 0;
+          }
+          if ((cell_y - (frame_len / 2) > 0)) {
+            crop_index[1] = cell_y - (frame_len / 2);
+          }
+          else {
+            crop_index[1] = 0;
+          }
+
+          // set the crop size
+          size_t in_frame_xlen =
+            in_frame->GetRequestedRegion().GetSize()[0];
+          if (crop_index[0] + frame_len <= in_frame_xlen) {
+            crop_size[0] = frame_len;
+          }
+          else {
+            crop_size[0] = in_frame_xlen - crop_index[0];
+          }
+          size_t in_frame_ylen =
+            in_frame->GetRequestedRegion().GetSize()[1];
+          if (crop_index[1] + frame_len <= in_frame_ylen) {
+            crop_size[1] = frame_len;
+          }
+          else {
+            crop_size[1] = in_frame_ylen - crop_index[1];
+          }
+
+          // create parts of the output images
+          
+
+        }
+
+        // write images to file
+      }  
+ 
+    }
+
+    cell_list.close();
 
   }
   catch (const std::exception &e) {
