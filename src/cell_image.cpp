@@ -51,6 +51,13 @@ using ReaderType = itk::ImageFileReader<IntegerImageType>;
 using WriterType = itk::ImageFileWriter<IntegerImageType>;
 using RGBWriterType = itk::ImageFileWriter<RGBImageType>;
 
+using IntegerImageConstIteratorType =
+  itk::ImageRegionConstIteratorWithIndex<IntegerImageType>;
+using IntegerImageIteratorType =
+  itk::ImageRegionIteratorWithIndex<IntegerImageType>;
+using RGBImageIteratorType =
+  itk::ImageRegionIteratorWithIndex<RGBImageType>;
+
 /******************************************************************************/
 /* Reader and writer                                                          */
 /******************************************************************************/
@@ -86,6 +93,24 @@ write_frame(WriterType::Pointer &writer,
          << e << endl;
   }
 }
+
+void
+write_frame_rgb(RGBWriterType::Pointer &writer,
+                const string &file,
+                const RGBImageType::Pointer &out) {
+
+  writer->SetFileName(file + ".tif");
+  writer->SetInput(out);
+  try {
+    writer->Update();
+  }
+  catch (const itk::ExceptionObject &e) {
+    cerr << "ITK EXCEPTION:" << endl
+         << e << endl;
+  }
+}
+
+
 
 /******************************************************************************/
 /* Misc.                                                                      */
@@ -147,17 +172,17 @@ main (int argc, char* argv[]) {
     const string ch_to_use_str = argv[4];
     vector<size_t> ch_to_use;
     csv_to_uint(ch_to_use_str, ch_to_use);
-   
+
     const string ch_start_str = argv[5];
-    vector<size_t> ch_start; 
+    vector<size_t> ch_start;
     csv_to_uint(ch_start_str, ch_start);
     if ((ch_to_use.size()) != 4 || (ch_start.size() != 4)) {
-      cerr << "ERROR: ch_use_vector and ch_start_offset must of length 4" 
+      cerr << "ERROR: ch_use_vector and ch_start_offset must of length 4"
            << endl;
       return EXIT_FAILURE;
     }
 
-    const size_t frame_len = std::stoi(argv[6]); 
+    const size_t frame_len = std::stoi(argv[6]);
 
     const string in_format = "Tile%06d.tif";
 
@@ -167,23 +192,23 @@ main (int argc, char* argv[]) {
     ReaderType::Pointer reader = ReaderType::New();
     WriterType::Pointer writer = WriterType::New();
     RGBWriterType::Pointer rgb_writer = RGBWriterType::New();
-    
+
     NameGeneratorType::Pointer name_gen = NameGeneratorType::New();
 
     // calculate number of channels
     size_t n_channels = 0;
     for (auto it = ch_to_use.begin(); it != ch_to_use.end(); ++it) {
       if (*it != 0) ++n_channels;
-    } 
+    }
     cout << "number of ch: " << n_channels << endl;
 
     // Allocate output tile image
     IntegerImageType::Pointer tile_img = IntegerImageType::New();
-    
+
     IntegerImageType::RegionType::SizeType tile_size;
     tile_size[0] = frame_len * n_channels;
-    tile_size[1] = frame_len; 
-     
+    tile_size[1] = frame_len;
+
     IntegerImageType::RegionType::IndexType tile_start;
     tile_start[0] = 0;
     tile_start[1] = 0;
@@ -207,11 +232,11 @@ main (int argc, char* argv[]) {
 
     // Allocate output RGB image
     RGBImageType::Pointer rgb_img = RGBImageType::New();
-    
+
     RGBImageType::RegionType::SizeType rgb_size;
     rgb_size[0] = frame_len;
     rgb_size[1] = frame_len;
-    
+
     RGBImageType::RegionType::IndexType rgb_start;
     rgb_start[0] = 0;
     rgb_start[1] = 0;
@@ -232,8 +257,8 @@ main (int argc, char* argv[]) {
     rgb_img->SetSpacing(rgb_spacing);
     rgb_img->SetRegions(rgb_region);
     rgb_img->Allocate();
- 
- 
+
+
 
     /**************************************************************************/
     /* Process frames                                                         */
@@ -244,7 +269,7 @@ main (int argc, char* argv[]) {
       return EXIT_FAILURE;
     }
 
-    string line;    
+    string line;
     while (getline(cell_list, line)) {
       // parse cell info
       vector<string> tokens;
@@ -252,23 +277,26 @@ main (int argc, char* argv[]) {
       size_t frame_id = std::stoi(tokens[0]);
       size_t cell_id = std::stoi(tokens[1]);
       size_t cell_x = std::round(std::stof(tokens[2]));
-      size_t cell_y = std::round(std::stof(tokens[3]));    
-     
+      size_t cell_y = std::round(std::stof(tokens[3]));
+
       // zero out the output images
-      tile_img->FillBuffer(0);
+      tile_img->FillBuffer(128);
       rgb_img->FillBuffer(RGBPixelType{});
+
+      size_t tile_count = 0;
 
       for (size_t i = 0; i < 4; ++i) {
         if (ch_to_use[i]) {
           // read input image
           name_gen->SetSeriesFormat(in_format);
-          name_gen->SetStartIndex(frame_id + ch_start[i]);
-          name_gen->SetEndIndex(frame_id + ch_start[i]);
-         
-          IntegerImageType::Pointer in_frame;  
-          read_frame(reader, frame_dir + name_gen->GetFileNames()[0], 
-                     in_frame); 
- 
+          name_gen->SetStartIndex(frame_id + ch_start[i] - 1);
+          name_gen->SetEndIndex(frame_id + ch_start[i] - 1);
+
+          IntegerImageType::Pointer in_frame;
+          read_frame(reader, frame_dir + name_gen->GetFileNames()[0],
+                     in_frame);
+
+
           // define region in inpput image
           IntegerImageType::RegionType crop_region;
           IntegerImageType::RegionType::IndexType crop_index;
@@ -306,14 +334,69 @@ main (int argc, char* argv[]) {
             crop_size[1] = in_frame_ylen - crop_index[1];
           }
 
+          crop_region.SetIndex(crop_index);
+          crop_region.SetSize(crop_size);
+
+
           // create parts of the output images
-          
+          // Iterators for input and output images
+          IntegerImageConstIteratorType in_it(in_frame, crop_region);
+          IntegerImageIteratorType tile_it(tile_img,
+                                           tile_img->GetRequestedRegion());
+          RGBImageIteratorType rgb_it(rgb_img,
+                                      rgb_img->GetRequestedRegion());
+
+          // zero offset to properly index output
+          in_it.GoToBegin();
+          IntegerImageType::OffsetType zero_offset;
+          zero_offset[0] = in_it.GetIndex()[0];
+          zero_offset[1] = in_it.GetIndex()[1];
+
+          // tile image offset
+          IntegerImageType::OffsetType tile_offset;
+          tile_offset[0] = frame_len * tile_count;
+          tile_offset[1] = 0;
+
+
+          while (!in_it.IsAtEnd()) {
+            // tile image
+            tile_it.SetIndex(in_it.GetIndex() - zero_offset + tile_offset);
+            tile_it.Set(in_it.Get());
+
+            // rgb image
+            rgb_it.SetIndex(in_it.GetIndex() - zero_offset);
+            RGBPixelType rgb_pixel;
+            if (i == 0) {
+              rgb_pixel.SetRed(in_it.Get());
+            }
+            else if (i == 1) {
+              rgb_pixel.SetGreen(in_it.Get());
+            }
+            else if (i == 2) {
+              rgb_pixel.SetBlue(in_it.Get());
+            }
+            else if (i == 3) {
+              rgb_pixel.SetRed(in_it.Get());
+              rgb_pixel.SetGreen(in_it.Get());
+              rgb_pixel.SetBlue(in_it.Get());
+            }
+
+            rgb_it.Set(rgb_pixel + rgb_it.Get());
+
+            ++in_it;
+          }
+          ++tile_count;
 
         }
 
-        // write images to file
-      }  
- 
+      }
+      // write images to file
+      write_frame(writer, out_dir + std::to_string(frame_id) + "_" +
+                  std::to_string(cell_id) + "_tile", tile_img);
+
+      write_frame_rgb(rgb_writer, out_dir + std::to_string(frame_id) +
+                      "_" + std::to_string(cell_id) + "_rgb", rgb_img);
+
     }
 
     cell_list.close();
