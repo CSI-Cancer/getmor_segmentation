@@ -259,8 +259,8 @@ main (int argc, char* argv[]) {
     vector<vector<string>> in_frame_files;
     for (size_t i = 0; i < n_channels; ++i) {
       name_gen->SetSeriesFormat(frame_format);
-      name_gen->SetStartIndex(channel_start[i]);
-      name_gen->SetEndIndex(channel_start[i] + n_frames - 1);
+      name_gen->SetStartIndex(start_offset + channel_start[i] - 1);
+      name_gen->SetEndIndex(start_offset + channel_start[i] + n_frames - 2);
       name_gen->SetIncrementIndex(1);
 
       in_frame_files.push_back(name_gen->GetFileNames());

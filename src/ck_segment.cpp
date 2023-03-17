@@ -197,7 +197,6 @@ void
 double_threshold(HistogramType::Pointer &low_th_hist,
                  MaskedHistogramType::Pointer &high_th_hist,
                  const float cell_frac,
-                 const float low_th_offset,
                  const float high_th_ratio,
                  const float high_th_base_quantile,
                  const RealImageType::Pointer &in,
@@ -216,7 +215,7 @@ double_threshold(HistogramType::Pointer &low_th_hist,
   low_th_hist->SetInput(in);
   low_th_hist->Update();
 
-  float low_quantile = 1 - cell_frac + low_th_offset;
+  float low_quantile = 1 - cell_frac;
   if (low_quantile >= 1)
     low_quantile = 0.995;
   else if (low_quantile < 0)
@@ -339,8 +338,8 @@ main (int argc, char *argv[]) {
     if (argc != 12) {
       cerr << argv[0]
            << " <in_dir> <out_dir> <sample_name>"
-           << " <start_offset> <num_frames> " << endl
-           << "\t<blur_iterations> <cell_frac> <low_th_offset>"
+           << " <start_offset> <num_frames> <channel_start> " << endl
+           << "\t<blur_iterations> <cell_frac> "
            << " <high_th_base_quantile> <high_th_ratio>" << endl
            << "\t<verbose>" << endl;
       return EXIT_FAILURE;
@@ -351,11 +350,11 @@ main (int argc, char *argv[]) {
     const string sample_name = argv[3];
     const size_t start_offset = std::stoi(argv[4]);
     const size_t n_frames = std::stoi(argv[5]);
+    const size_t ch_start = std::stoi(argv[6]);
 
-    const size_t blur_iterations = std::stoi(argv[6]);
+    const size_t blur_iterations = std::stoi(argv[7]);
 
-    const float cell_frac_method = std::stof(argv[7]);
-    const float low_th_offset = std::stof(argv[8]);
+    const float cell_frac_method = std::stof(argv[8]);
     const float high_th_base_quantile = std::stof(argv[9]);
     const float high_th_ratio = std::stof(argv[10]);
 
@@ -442,8 +441,8 @@ main (int argc, char *argv[]) {
     /**************************************************************************/
     // input file names
     name_gen->SetSeriesFormat(in_format);
-    name_gen->SetStartIndex(start_offset);
-    name_gen->SetEndIndex(start_offset + n_frames);
+    name_gen->SetStartIndex(start_offset + ch_start - 1);
+    name_gen->SetEndIndex(start_offset + ch_start + n_frames - 2);
     name_gen->SetIncrementIndex(1);
 
     vector<string> in_frame_files;
@@ -452,7 +451,7 @@ main (int argc, char *argv[]) {
     // output file names
     name_gen->SetSeriesFormat(outfile_prefix);
     name_gen->SetStartIndex(start_offset);
-    name_gen->SetEndIndex(start_offset + n_frames);
+    name_gen->SetEndIndex(start_offset + n_frames - 1);
     name_gen->SetIncrementIndex(1);
 
     vector<string> out_frame_files;
@@ -490,7 +489,7 @@ main (int argc, char *argv[]) {
       float cell_frac = 1 - cell_frac_method;
       RealImageType::Pointer double_th_frame;
       double_threshold(th_low_hist, th_high_hist,
-                       cell_frac, low_th_offset,
+                       cell_frac,
                        high_th_ratio, high_th_base_quantile,
                        blurred_frame, th_low_binary, th_high_binary,
                        reconstructor, double_th_frame,
