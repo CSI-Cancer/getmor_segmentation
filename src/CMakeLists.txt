@@ -20,6 +20,9 @@ target_link_libraries(merge_and_watershed ${ITK_LIBRARIES})
 add_executable(feature_extraction feature_extraction.cpp)
 target_link_libraries(feature_extraction ${ITK_LIBRARIES})
 
+add_executable(filter_features filter_features.cpp)
+target_link_libraries(filter_features ${ITK_LIBRARIES})
+
 add_executable(cell_image cell_image.cpp)
 target_link_libraries(cell_image ${ITK_LIBRARIES})
 
