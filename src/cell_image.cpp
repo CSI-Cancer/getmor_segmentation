@@ -200,7 +200,6 @@ main (int argc, char* argv[]) {
     for (auto it = ch_to_use.begin(); it != ch_to_use.end(); ++it) {
       if (*it != 0) ++n_channels;
     }
-    cout << "number of ch: " << n_channels << endl;
 
     // Allocate output tile image
     IntegerImageType::Pointer tile_img = IntegerImageType::New();
@@ -276,8 +275,8 @@ main (int argc, char* argv[]) {
       split_string(line, tokens);
       size_t frame_id = std::stoi(tokens[0]);
       size_t cell_id = std::stoi(tokens[1]);
-      size_t cell_x = std::round(std::stof(tokens[2]));
-      size_t cell_y = std::round(std::stof(tokens[3]));
+      float cell_x = std::round(std::stof(tokens[2]));
+      float cell_y = std::round(std::stof(tokens[3]));
 
       // zero out the output images
       tile_img->FillBuffer(128);
@@ -336,7 +335,6 @@ main (int argc, char* argv[]) {
 
           crop_region.SetIndex(crop_index);
           crop_region.SetSize(crop_size);
-
 
           // create parts of the output images
           // Iterators for input and output images
