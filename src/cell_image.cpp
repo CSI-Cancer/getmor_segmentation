@@ -158,10 +158,11 @@ main (int argc, char* argv[]) {
     /**************************************************************************/
     /* Parse arguments                                                        */
     /**************************************************************************/
-    if (argc != 7) {
+    if (argc != 8) {
       cerr << argv[0]
            << " <frame_dir> <out_dir> <cell_list_file>" << endl
-           << "\t<ch_use_vector> <ch_start_offset> <out_frame_size>" << endl;
+           << "\t<ch_use_vector> <ch_start_offset> <ch_gain>" << endl
+           << "\t<out_frame_size>" << endl;
       return EXIT_FAILURE;
     }
 
@@ -176,13 +177,18 @@ main (int argc, char* argv[]) {
     const string ch_start_str = argv[5];
     vector<size_t> ch_start;
     csv_to_uint(ch_start_str, ch_start);
+
+    const string ch_gain_str = argv[6];
+    vector<size_t> ch_gain;
+    csv_to_uint(ch_gain_str, ch_gain);
+
     if ((ch_to_use.size()) != 4 || (ch_start.size() != 4)) {
       cerr << "ERROR: ch_use_vector and ch_start_offset must of length 4"
            << endl;
       return EXIT_FAILURE;
     }
 
-    const size_t frame_len = std::stoi(argv[6]);
+    const size_t frame_len = std::stoi(argv[7]);
 
     const string in_format = "Tile%06d.tif";
 
@@ -258,6 +264,7 @@ main (int argc, char* argv[]) {
     rgb_img->Allocate();
 
 
+    constexpr size_t PixelMax = std::numeric_limits<IntegerPixelType>::max();
 
     /**************************************************************************/
     /* Process frames                                                         */
@@ -357,26 +364,36 @@ main (int argc, char* argv[]) {
 
 
           while (!in_it.IsAtEnd()) {
+            // compute gain
+            size_t gain_val = in_it.Get() * ch_gain[i];
+            IntegerPixelType out_val;
+            if (gain_val > PixelMax) {
+              out_val = PixelMax;
+            }
+            else {
+              out_val = gain_val;
+            }
+
             // tile image
             tile_it.SetIndex(in_it.GetIndex() - zero_offset + tile_offset);
-            tile_it.Set(in_it.Get());
+            tile_it.Set(out_val);
 
             // rgb image
             rgb_it.SetIndex(in_it.GetIndex() - zero_offset);
             RGBPixelType rgb_pixel;
             if (i == 0) {
-              rgb_pixel.SetRed(in_it.Get());
+              rgb_pixel.SetRed(out_val);
             }
             else if (i == 1) {
-              rgb_pixel.SetGreen(in_it.Get());
+              rgb_pixel.SetGreen(out_val);
             }
             else if (i == 2) {
-              rgb_pixel.SetBlue(in_it.Get());
+              rgb_pixel.SetBlue(out_val);
             }
             else if (i == 3) {
-              rgb_pixel.SetRed(in_it.Get());
-              rgb_pixel.SetGreen(in_it.Get());
-              rgb_pixel.SetBlue(in_it.Get());
+              rgb_pixel.SetRed(out_val);
+              rgb_pixel.SetGreen(out_val);
+              rgb_pixel.SetBlue(out_val);
             }
 
             rgb_it.Set(rgb_pixel + rgb_it.Get());
