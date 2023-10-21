@@ -232,8 +232,8 @@ main (int argc, char* argv[]) {
     /**************************************************************************/
     if (argc < 7) {
       cerr << argv[0]
-           << " <in_dir> <out_dir>"
-           << " <start_offset> <num_frames> <watershed_level>"
+           << " <in_dir> <out_dir> <start_offset> <channel_start>" 
+           << " <num_frames> <watershed_level>"
            << " <verbose>" << endl;
       return EXIT_FAILURE;
     }
@@ -242,11 +242,12 @@ main (int argc, char* argv[]) {
     const string out_dir = argv[2];
 
     const size_t start_offset = std::stoi(argv[3]);
-    const size_t n_frames = std::stoi(argv[4]);
+    const size_t ch_start = std::stoi(argv[4]);
+    const size_t n_frames = std::stoi(argv[5]);
 
-    const float watershed_level = std::stof(argv[5]);
+    const float watershed_level = std::stof(argv[6]);
 
-    const size_t VERBOSE = std::stoi(argv[6]);
+    const size_t VERBOSE = std::stoi(argv[7]);
 
     const string in_format = "mask%06d.tif";
     const string outfile_prefix = "label%06d";
@@ -288,8 +289,8 @@ main (int argc, char* argv[]) {
     /**************************************************************************/
     // input file names
     name_gen->SetSeriesFormat(in_format);
-    name_gen->SetStartIndex(start_offset);
-    name_gen->SetEndIndex(start_offset + n_frames);
+    name_gen->SetStartIndex(start_offset + ch_start - 1);
+    name_gen->SetEndIndex(start_offset + ch_start + n_frames - 2);
     name_gen->SetIncrementIndex(1);
 
     vector<string> in_frame_files;
@@ -298,7 +299,7 @@ main (int argc, char* argv[]) {
     // output file names
     name_gen->SetSeriesFormat(outfile_prefix);
     name_gen->SetStartIndex(start_offset);
-    name_gen->SetEndIndex(start_offset + n_frames);
+    name_gen->SetEndIndex(start_offset + n_frames - 1);
     name_gen->SetIncrementIndex(1);
 
     vector<string> out_frame_files;
