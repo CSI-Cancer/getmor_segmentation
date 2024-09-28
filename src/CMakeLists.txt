@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10.2 FATAL_ERROR)
 
 project(getmor_segmentation)
 
-set(ITK_DIR /home/rish/code/tools/itk/itk_build)
+set(ITK_DIR <path_to_itk_build>)
 find_package(ITK REQUIRED)
 include(${ITK_USE_FILE})
 

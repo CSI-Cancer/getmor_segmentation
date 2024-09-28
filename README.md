@@ -7,14 +7,26 @@ rare cells. This repo contains the code that we used for image analysis
 of scanned Immunofluorescence slides.
 
 ## Dependencies and compilation
-1) We make extensive use of the ITK toolkit for image analysis.
+1. We make extensive use of the ITK toolkit for image analysis.
 Download and install the
-[ITK toolkit]():
+[ITK toolkit](https://itk.org/):
 
-2) Set the `ITK_DIR` variable in `src/CMakeLists.txt`
+2. Set the `ITK_DIR` variable in `src/CMakeLists.txt`
 
-3) Create a build director and withing this directory execute:
+3. Create a build director:
+```
+mkdir build; cd build
+```
 
+4. Create makefiles using:
+```
+cmake <path_to_rerp>/getmor_segmentation/src/
+```
+
+5. Compile the code with:
+```
+make
+```
 
 
 ## Procedure for GeTMoR rare cell detection
